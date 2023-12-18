@@ -10,7 +10,7 @@ RUN usermod -u 1000 www-data
 
 RUN apk add php8 php8-zip acl fcgi file sudo composer zip gd libzip-dev icu-dev libpng-dev libwebp-dev libjpeg-turbo-dev freetype-dev
 
-RUN apk --update add nodejs yarn php8-pcntl
+RUN apk --update add nodejs yarn supervisor php8-pcntl
 
 RUN set -eux; \
 	apk add --no-cache --virtual .build-deps \
