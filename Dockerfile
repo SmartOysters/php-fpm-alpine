@@ -8,7 +8,7 @@ RUN echo http://dl-cdn.alpinelinux.org/alpine/v3.12/main/ >> /etc/apk/repositori
 
 RUN usermod -u 1000 www-data
 
-RUN apk add php8 php8-zip acl fcgi file sudo composer zip gd libzip-dev icu-dev libpng-dev libwebp-dev libjpeg-turbo-dev freetype-dev
+RUN apk add php8 php8-zip acl fcgi file sudo composer zip gd make libzip-dev icu-dev libpng-dev libwebp-dev libjpeg-turbo-dev freetype-dev
 
 RUN apk --update add nodejs yarn supervisor php8-pcntl
 
