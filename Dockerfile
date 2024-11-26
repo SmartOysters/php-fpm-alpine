@@ -1,16 +1,22 @@
-FROM php:8.1.4-fpm-alpine
+FROM php:8.1.30-fpm-alpine3.20
 LABEL maintainer="oceanfarmr <technology@oceanfarmr.com>"
 
 RUN apk --update --no-cache add git shadow
 
-RUN echo http://dl-cdn.alpinelinux.org/alpine/v3.12/community/ >> /etc/apk/repositories
-RUN echo http://dl-cdn.alpinelinux.org/alpine/v3.12/main/ >> /etc/apk/repositories
+#RUN echo http://dl-cdn.alpinelinux.org/alpine/v3.20/community/ >> /etc/apk/repositories
+#RUN echo http://dl-cdn.alpinelinux.org/alpine/v3.20/main/ >> /etc/apk/repositories
+
+RUN apk update && apk upgrade
 
 RUN usermod -u 1000 www-data
 
-RUN apk add php8 php8-zip acl fcgi file sudo composer zip gd make libzip-dev icu-dev libpng-dev libwebp-dev libjpeg-turbo-dev freetype-dev
+RUN apk add acl fcgi file sudo composer zip gd make libzip-dev icu-dev libpng-dev libwebp-dev libjpeg-turbo-dev freetype-dev
 
-RUN apk --update add nodejs yarn supervisor php8-pcntl
+# Install Node.js, Yarn, and Supervisor
+RUN apk --update add nodejs yarn supervisor
+
+# Install PHP extensions (including pcntl)
+RUN docker-php-ext-install pcntl
 
 RUN set -eux; \
 	apk add --no-cache --virtual .build-deps \
@@ -43,11 +49,8 @@ RUN docker-php-ext-configure calendar && \
 RUN docker-php-ext-configure gd --enable-gd --with-freetype --with-jpeg --with-webp && \
     docker-php-ext-install gd
 
-RUN apk add --no-cache \
-        python3 \
-        py3-pip \
-    && pip3 install --upgrade pip \
-    && pip3 install \
-        awscli \
+RUN apk add --no-cache python3 py3-pip \
+    && pip3 install --upgrade pip --break-system-packages --root-user-action=ignore \
+    && pip3 install --break-system-packages awscli --root-user-action=ignore \
     && rm -rf /var/cache/apk/* \
-    && ln -s /usr/bin/python3 /usr/bin/python
+    && [ ! -e /usr/bin/python ] && ln -s /usr/bin/python3 /usr/bin/python || true
