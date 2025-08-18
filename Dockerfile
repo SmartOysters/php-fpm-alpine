@@ -27,13 +27,14 @@ RUN apk add postgresql postgresql-dev \
   && docker-php-ext-configure pgsql -with-pgsql=/usr/local/pgsql \
   && docker-php-ext-install pdo pdo_pgsql pgsql
 
-# Optional: install AWS CLI via pip (keep it minimal)
-RUN apk add --no-cache python3 py3-pip && \
-    python3 -m venv /opt/py && \
-    /opt/py/bin/pip install --upgrade pip && \
-    /opt/py/bin/pip install "awscli<2" && \
-    ln -sf /opt/py/bin/aws /usr/local/bin/aws && \
-    ln -sf /usr/bin/python3 /usr/bin/python
+# PIP Setup
+RUN apk add --no-cache python3 \
+  && python3 -m venv /opt/py \
+  && /opt/py/bin/python -m ensurepip --upgrade \
+  && /opt/py/bin/pip install --no-cache-dir --upgrade "pip" "setuptools>=78.1.1" \
+  && /opt/py/bin/pip install --no-cache-dir "awscli<2" \
+  && ln -sf /opt/py/bin/aws /usr/local/bin/aws \
+  && ln -sf /usr/bin/python3 /usr/bin/python
 
 # Use Composer from the official image (prebuilt, no extra PHP pulled in)
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
