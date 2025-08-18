@@ -1,48 +1,59 @@
-# Pin to a specific PHP & Alpine for repeatable builds (adjust versions as needed)
 FROM php:8.2.21-fpm-alpine3.20
 LABEL maintainer="oceanfarmr <technology@oceanfarmr.com>"
 
+RUN apk --update --no-cache add git shadow
+
 # System packages (no php8-*), build deps, and runtime libs
-RUN apk add --no-cache \
-      git shadow bash curl unzip \
-      icu-dev libzip-dev zlib-dev \
-      libpng-dev libwebp-dev libjpeg-turbo-dev freetype-dev \
-      postgresql-dev libpq \
-      nodejs yarn supervisor \
-      python3 py3-pip
+RUN apk add acl fcgi file sudo composer zip gd make libzip-dev icu-dev libpng-dev libwebp-dev libjpeg-turbo-dev freetype-dev
+
+RUN apk --update add nodejs yarn supervisor
+
+RUN set -eux; \
+	apk add --no-cache --virtual .build-deps \
+		$PHPIZE_DEPS \
+		zlib-dev \
+	; \
+    runDeps="$( \
+		scanelf --needed --nobanner --format '%n#p' --recursive /usr/local/lib/php/extensions \
+			| tr ',' '\n' \
+			| sort -u \
+			| awk 'system("[ -e /usr/local/lib/" $1 " ]") == 0 { next } { print "so:" $1 }' \
+	)"; \
+	apk add --no-cache --virtual .phpexts-rundeps $runDeps; \
+	\
+	apk del .build-deps
+
+RUN apk add postgresql postgresql-dev \
+  && docker-php-ext-configure pgsql -with-pgsql=/usr/local/pgsql \
+  && docker-php-ext-install pdo pdo_pgsql pgsql
 
 # Optional: install AWS CLI via pip (keep it minimal)
-RUN pip3 install --upgrade pip && pip3 install awscli && rm -rf /root/.cache
+RUN apk add --no-cache python3 py3-pip && \
+    python3 -m venv /opt/py && \
+    /opt/py/bin/pip install --upgrade pip && \
+    /opt/py/bin/pip install "awscli<2" && \
+    ln -sf /opt/py/bin/aws /usr/local/bin/aws && \
+    ln -sf /usr/bin/python3 /usr/bin/python
 
 # Use Composer from the official image (prebuilt, no extra PHP pulled in)
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
 # Align www-data UID with host if you need 1000 (Alpine www-data is 82 by default)
-RUN usermod -u 1000 www-data || true
+RUN usermod -u 1000 www-data
 
 # Build & enable PHP extensions
-# Note: configure BEFORE install
 RUN set -eux; \
-    docker-php-ext-configure intl; \
-    docker-php-ext-configure zip; \
+    apk add --no-cache --virtual .build-deps $PHPIZE_DEPS \
+        icu-dev libzip-dev libpng-dev libwebp-dev libjpeg-turbo-dev freetype-dev postgresql-dev; \
     docker-php-ext-configure gd --with-freetype --with-jpeg --with-webp; \
-    docker-php-ext-install -j"$(nproc)" \
-        intl zip gd pcntl opcache pdo_pgsql pgsql
+    docker-php-ext-configure zip; \
+    docker-php-ext-configure intl; \
+    docker-php-ext-install -j"$(nproc)" intl zip gd pcntl pdo_pgsql pgsql; \
+    apk del .build-deps
 
-# (Optional) strip symbols to shrink image
-RUN find /usr/local/lib/php/extensions -name '*.so' -exec strip --strip-unneeded {} + || true
+RUN docker-php-ext-configure calendar && \
+    docker-php-ext-install calendar
+RUN docker-php-ext-configure gd --enable-gd --with-freetype --with-jpeg --with-webp && \
+    docker-php-ext-install gd
 
-# Set working directory
-WORKDIR /var/www/html
-
-# (Optional) tune PHP-FPM & opcache via INI
-# COPY .docker/php/conf.d/*.ini /usr/local/etc/php/conf.d/
-
-# Ensure ownership for runtime (if you write to /var/www/html)
-RUN chown -R www-data:www-data /var/www/html
-
-# Expose FPM port
-EXPOSE 9000
-
-# Default command
-CMD ["php-fpm"]
+RUN find /usr/local/lib/php/extensions -name '*.so' -exec strip --strip-unneeded {} +
