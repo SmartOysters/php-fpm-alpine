@@ -1,4 +1,4 @@
-FROM php:8.3-fpm-alpine3.22
+FROM php:8.3-fpm-alpine3.24
 LABEL maintainer="oceanfarmr <technology@oceanfarmr.com>"
 
 RUN apk --update --no-cache add git shadow
